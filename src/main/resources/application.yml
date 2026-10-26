@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: inventory-service
+  datasource:
+    url: ${INVENTORY_DB_URL:jdbc:postgresql://localhost:5432/inventory}
+    username: ${INVENTORY_DB_USER:mercatus}
+    password: ${INVENTORY_DB_PASSWORD:mercatus}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+server:
+  servlet:
+    context-path: /api/v1
+
+logging:
+  structured:
+    format:
+      console: ecs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
