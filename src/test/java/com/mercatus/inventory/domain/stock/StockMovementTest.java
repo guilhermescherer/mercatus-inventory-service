@@ -16,8 +16,8 @@ class StockMovementTest {
     @Test
     void receiptsAndShipmentsHaveOppositeSignsAndShipmentReferencesReservation() {
         UUID reservation = UUID.randomUUID();
-        var receipt = StockMovement.receipt("SKU", 3, now);
-        var shipment = StockMovement.shipment("SKU", 2, reservation, now);
+        var receipt = StockMovement.receipt(UUID.randomUUID(), "SKU", 3, now);
+        var shipment = StockMovement.shipment(UUID.randomUUID(), "SKU", 2, reservation, now);
         assertThat(receipt.quantity()).isEqualTo(3);
         assertThat(receipt.reservationId()).isNull();
         assertThat(shipment.quantity()).isEqualTo(-2);
@@ -27,21 +27,21 @@ class StockMovementTest {
 
     @Test
     void adjustmentsRequireNonZeroQuantityAndMeaningfulReason() {
-        assertThat(StockMovement.adjustment("SKU", -3, "Damage", now).quantity()).isEqualTo(-3);
-        assertThat(StockMovement.adjustment("SKU", 3, "Count", now).quantity()).isEqualTo(3);
-        assertThatThrownBy(() -> StockMovement.adjustment("SKU", 0, "Count", now))
+        assertThat(StockMovement.adjustment(UUID.randomUUID(), "SKU", -3, "Damage", now).quantity()).isEqualTo(-3);
+        assertThat(StockMovement.adjustment(UUID.randomUUID(), "SKU", 3, "Count", now).quantity()).isEqualTo(3);
+        assertThatThrownBy(() -> StockMovement.adjustment(UUID.randomUUID(), "SKU", 0, "Count", now))
                 .isInstanceOf(DomainRuleException.class);
-        assertThatThrownBy(() -> StockMovement.adjustment("SKU", 1, " ", now))
+        assertThatThrownBy(() -> StockMovement.adjustment(UUID.randomUUID(), "SKU", 1, " ", now))
                 .isInstanceOf(DomainRuleException.class);
     }
 
     @Test
     void factoriesRejectInvalidSignsAndMissingShipmentReservation() {
-        assertThatThrownBy(() -> StockMovement.receipt("SKU", -1, now))
+        assertThatThrownBy(() -> StockMovement.receipt(UUID.randomUUID(), "SKU", -1, now))
                 .isInstanceOf(DomainRuleException.class);
-        assertThatThrownBy(() -> StockMovement.shipment("SKU", -1, UUID.randomUUID(), now))
+        assertThatThrownBy(() -> StockMovement.shipment(UUID.randomUUID(), "SKU", -1, UUID.randomUUID(), now))
                 .isInstanceOf(DomainRuleException.class);
-        assertThatThrownBy(() -> StockMovement.shipment("SKU", 1, null, now))
+        assertThatThrownBy(() -> StockMovement.shipment(UUID.randomUUID(), "SKU", 1, null, now))
                 .isInstanceOf(DomainRuleException.class);
     }
 }

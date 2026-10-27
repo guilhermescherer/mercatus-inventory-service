@@ -56,9 +56,9 @@ class ReservationLockIT {
     void reservationLockSqlDoesNotJoinCollectionAndStockLocksFollowSkuOrder() {
         String a = "A-" + UUID.randomUUID();
         String b = "B-" + UUID.randomUUID();
-        receive.receive(a, 10);
-        receive.receive(b, 10);
-        UUID id = reserve.reserve(UUID.randomUUID(), List.of(new ReserveUseCase.Line(b, 2), new ReserveUseCase.Line(a, 3)));
+        receive.receive(new ReceiveStockUseCase.ReceiveStockCommand(a, 10));
+        receive.receive(new ReceiveStockUseCase.ReceiveStockCommand(b, 10));
+        UUID id = reserve.reserve(new ReserveUseCase.ReserveCommand(UUID.randomUUID(), List.of(new ReserveUseCase.ReserveCommand.Line(b, 2), new ReserveUseCase.ReserveCommand.Line(a, 3))));
         SqlCapture.clear();
         try {
             confirm.confirm(id);
@@ -76,7 +76,7 @@ class ReservationLockIT {
     @Test
     void competingCreatorCanSucceedAfterFirstCreatorRollsBack() throws Exception {
         String sku = "SKU-" + UUID.randomUUID();
-        receive.receive(sku, 10);
+        receive.receive(new ReceiveStockUseCase.ReceiveStockCommand(sku, 10));
         UUID order = UUID.randomUUID();
         var claimed = new CountDownLatch(1);
         var release = new CountDownLatch(1);
@@ -87,7 +87,7 @@ class ReservationLockIT {
         try {
             var first = pool.submit(() -> new TransactionTemplate(transactionManager).execute(status -> {
                 firstPid.set(jdbc.queryForObject("select pg_backend_pid()", Integer.class));
-                UUID id = reserve.reserve(order, List.of(new ReserveUseCase.Line(sku, 3)));
+                UUID id = reserve.reserve(new ReserveUseCase.ReserveCommand(order, List.of(new ReserveUseCase.ReserveCommand.Line(sku, 3))));
                 claimed.countDown();
                 try {
                     if (!release.await(20, TimeUnit.SECONDS)) {
@@ -104,7 +104,7 @@ class ReservationLockIT {
             var second = pool.submit(() -> new TransactionTemplate(transactionManager).execute(status -> {
                 secondPid.set(jdbc.queryForObject("select pg_backend_pid()", Integer.class));
                 contenderStarted.countDown();
-                return reserve.reserve(order, List.of(new ReserveUseCase.Line(sku, 2)));
+                return reserve.reserve(new ReserveUseCase.ReserveCommand(order, List.of(new ReserveUseCase.ReserveCommand.Line(sku, 2))));
             }));
             assertThat(contenderStarted.await(10, TimeUnit.SECONDS)).isTrue();
             await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->

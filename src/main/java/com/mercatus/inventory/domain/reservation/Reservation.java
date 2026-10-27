@@ -26,7 +26,7 @@ public class Reservation {
         this.expiresAt = expiresAt;
     }
 
-    public static Reservation create(UUID orderId, List<ReservationLine> lines, Duration ttl, Instant now) {
+    public static Reservation create(UUID id, UUID orderId, List<ReservationLine> lines, Duration ttl, Instant now) {
         if (orderId == null) {
             throw new DomainRuleException("Order ID is required");
         }
@@ -40,7 +40,7 @@ public class Reservation {
         if (distinctSkus != lines.size()) {
             throw new DomainRuleException("Reservation must not repeat the same SKU");
         }
-        return new Reservation(UUID.randomUUID(), orderId, lines,
+        return new Reservation(id, orderId, lines,
                 ReservationStatus.RESERVED, now, now.plus(ttl));
     }
 

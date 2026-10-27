@@ -5,8 +5,11 @@ import java.util.UUID;
 
 public interface ReserveUseCase {
 
-    UUID reserve(UUID orderId, List<Line> lines);
+    UUID reserve(ReserveCommand command);
 
-    record Line(String skuCode, long quantity) {
+    record ReserveCommand(UUID orderId, List<Line> lines) {
+
+        public record Line(String skuCode, long quantity) {
+        }
     }
 }

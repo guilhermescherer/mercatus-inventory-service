@@ -25,21 +25,21 @@ public record StockMovement(UUID id, String skuCode, StockMovementType type, lon
         }
     }
 
-    public static StockMovement receipt(String skuCode, long quantity, Instant now) {
-        return new StockMovement(UUID.randomUUID(), skuCode, StockMovementType.RECEIPT,
+    public static StockMovement receipt(UUID id, String skuCode, long quantity, Instant now) {
+        return new StockMovement(id, skuCode, StockMovementType.RECEIPT,
                 quantity, now, null, null);
     }
 
-    public static StockMovement adjustment(String skuCode, long delta, String reason, Instant now) {
-        return new StockMovement(UUID.randomUUID(), skuCode, StockMovementType.ADJUSTMENT,
+    public static StockMovement adjustment(UUID id, String skuCode, long delta, String reason, Instant now) {
+        return new StockMovement(id, skuCode, StockMovementType.ADJUSTMENT,
                 delta, now, reason, null);
     }
 
-    public static StockMovement shipment(String skuCode, long quantity, UUID reservationId, Instant now) {
+    public static StockMovement shipment(UUID id, String skuCode, long quantity, UUID reservationId, Instant now) {
         if (quantity <= 0) {
             throw new DomainRuleException("Shipment quantity must be positive");
         }
-        return new StockMovement(UUID.randomUUID(), skuCode, StockMovementType.SHIPMENT,
+        return new StockMovement(id, skuCode, StockMovementType.SHIPMENT,
                 -quantity, now, null, reservationId);
     }
 }

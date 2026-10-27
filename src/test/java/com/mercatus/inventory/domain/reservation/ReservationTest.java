@@ -17,21 +17,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ReservationTest {
 
     private Reservation reserved() {
-        return Reservation.create(UUID.randomUUID(),
+        return Reservation.create(UUID.randomUUID(), UUID.randomUUID(),
                 List.of(new ReservationLine("SKU-A", 1), new ReservationLine("SKU-B", 2)),
                 Duration.ofMinutes(30), Instant.parse("2026-01-01T00:00:00Z"));
     }
 
     @Test
     void createRequiresAtLeastOneLine() {
-        assertThatThrownBy(() -> Reservation.create(UUID.randomUUID(), List.of(),
+        assertThatThrownBy(() -> Reservation.create(UUID.randomUUID(), UUID.randomUUID(), List.of(),
                 Duration.ofMinutes(30), Instant.now()))
                 .isInstanceOf(DomainRuleException.class);
     }
 
     @Test
     void createRejectsDuplicateSku() {
-        assertThatThrownBy(() -> Reservation.create(UUID.randomUUID(),
+        assertThatThrownBy(() -> Reservation.create(UUID.randomUUID(), UUID.randomUUID(),
                 List.of(new ReservationLine("SKU-A", 1), new ReservationLine("SKU-A", 2)),
                 Duration.ofMinutes(30), Instant.now()))
                 .isInstanceOf(DomainRuleException.class);

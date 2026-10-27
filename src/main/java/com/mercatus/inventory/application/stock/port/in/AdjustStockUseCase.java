@@ -2,5 +2,8 @@ package com.mercatus.inventory.application.stock.port.in;
 
 public interface AdjustStockUseCase {
 
-    void adjust(String skuCode, long delta, String reason);
+    void adjust(AdjustStockCommand command);
+
+    record AdjustStockCommand(String skuCode, long delta, String reason) {
+    }
 }

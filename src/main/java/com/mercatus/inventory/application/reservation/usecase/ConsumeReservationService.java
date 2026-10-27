@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 @Service
 public class ConsumeReservationService implements ConsumeReservationUseCase {
@@ -23,13 +24,16 @@ public class ConsumeReservationService implements ConsumeReservationUseCase {
     private final StockLineLocker stockLineLocker;
     private final StockMovementRepository movementRepository;
     private final Clock clock;
+    private final Supplier<UUID> identifiers;
 
     public ConsumeReservationService(ReservationRepository reservationRepository, StockLineLocker stockLineLocker,
-                                     StockMovementRepository movementRepository, Clock clock) {
+                                     StockMovementRepository movementRepository, Clock clock,
+                                     Supplier<UUID> identifiers) {
         this.movementRepository = movementRepository;
         this.clock = clock;
         this.reservationRepository = reservationRepository;
         this.stockLineLocker = stockLineLocker;
+        this.identifiers = identifiers;
     }
 
     @Override
@@ -44,7 +48,7 @@ public class ConsumeReservationService implements ConsumeReservationUseCase {
         stockLineLocker.lockApplyAndSave(reservation.lines(), StockItem::consume);
         Instant now = Instant.now(clock);
         reservation.lines().forEach(line -> movementRepository.append(
-                StockMovement.shipment(line.skuCode(), line.quantity(), reservation.id(), now)));
+                StockMovement.shipment(identifiers.get(), line.skuCode(), line.quantity(), reservation.id(), now)));
         reservationRepository.save(reservation);
     }
 }

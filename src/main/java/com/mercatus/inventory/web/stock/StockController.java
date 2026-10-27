@@ -34,13 +34,13 @@ public class StockController {
     @PostMapping("/{skuCode}/receipts")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void receive(@PathVariable String skuCode, @Valid @RequestBody ReceiveStockRequest request) {
-        receiveStock.receive(skuCode, request.quantity());
+        receiveStock.receive(new ReceiveStockUseCase.ReceiveStockCommand(skuCode, request.quantity()));
     }
 
     @PostMapping("/{skuCode}/adjustments")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void adjust(@PathVariable String skuCode, @Valid @RequestBody AdjustStockRequest request) {
-        adjustStock.adjust(skuCode, request.delta(), request.reason());
+        adjustStock.adjust(new AdjustStockUseCase.AdjustStockCommand(skuCode, request.delta(), request.reason()));
     }
 
     @GetMapping("/{skuCode}")

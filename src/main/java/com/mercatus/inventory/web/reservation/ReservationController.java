@@ -38,10 +38,10 @@ public class ReservationController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ReservationResponse create(@Valid @RequestBody ReserveRequest request) {
-        List<ReserveUseCase.Line> lines = request.lines().stream()
-                .map(l -> new ReserveUseCase.Line(l.skuCode(), l.quantity()))
+        List<ReserveUseCase.ReserveCommand.Line> lines = request.lines().stream()
+                .map(l -> new ReserveUseCase.ReserveCommand.Line(l.skuCode(), l.quantity()))
                 .toList();
-        UUID id = reserve.reserve(request.orderId(), lines);
+        UUID id = reserve.reserve(new ReserveUseCase.ReserveCommand(request.orderId(), lines));
         return new ReservationResponse(id);
     }
 
