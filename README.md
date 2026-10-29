@@ -184,5 +184,3 @@ chegou aos testes de integração, mas Testcontainers não conseguiu
 acessar o socket Docker (`Operation not permitted`). Os testes de migrations,
 SQL de locks e concorrência foram escritos e compilados; a execução com
 PostgreSQL real permanece pendente. A fase 4 ainda não está declarada concluída.
-Os resultados e as pendências estão nas
-[evidências da entrega](../docs/specs/inventory-phase4/validation.md).
