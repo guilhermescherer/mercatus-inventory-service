@@ -22,30 +22,17 @@ class MessagingConfig {
         return new ContractReader(jsonMapper);
     }
 
-    // Ao desligar o serviço, o produtor tenta entregar o que ainda está em memória.
-    // O padrão do Spring espera até 30s; aqui 5s bastam, porque o que não saiu
-    // continua pendente na outbox e será reenviado na próxima subida.
     @Bean
     DefaultKafkaProducerFactoryCustomizer producerCloseTimeout() {
         return factory -> factory.setPhysicalCloseTimeout(5);
     }
 
-    // O listener padrão do Spring Kafka escreve a mensagem INTEIRA no log quando um
-    // envio falha. Como mensagens podem conter dados de clientes, trocamos por um
-    // listener que não faz nada; o OutboxPublisher já loga a falha só com o id.
     @Bean
     ProducerListener<Object, Object> silentProducerListener() {
         return new ProducerListener<>() {
         };
     }
 
-    // O que fazer quando o processamento de uma mensagem recebida dá erro:
-    // - erro técnico (banco fora, timeout): tenta de novo a MESMA mensagem, esperando
-    //   1s, 2s, 4s... até 30s entre tentativas, sem desistir. O offset não avança,
-    //   então a mensagem não é "esquecida".
-    // - mensagem fora do contrato (ContractViolationException): tentar de novo não
-    //   adianta, ela sempre vai falhar. Loga como ERROR e segue para a próxima, para
-    //   não travar a fila inteira por causa de uma mensagem quebrada.
     @Bean
     DefaultErrorHandler kafkaErrorHandler() {
         var backOff = new ExponentialBackOff(1_000, 2.0);

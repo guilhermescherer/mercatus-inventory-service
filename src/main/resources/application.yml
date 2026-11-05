@@ -11,15 +11,8 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
-  # Kafka. bootstrap-servers: endereço do broker (o "servidor" do Kafka).
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    # Produtor (quem envia).
-    # acks=all: o broker só confirma depois de gravar a mensagem com segurança.
-    # enable.idempotence: se o produtor reenviar por falha de rede, o broker não
-    # grava a mesma mensagem duas vezes.
-    # *.timeout.ms / max.block.ms: quanto esperar antes de desistir de um envio;
-    # a outbox tenta de novo depois.
     producer:
       acks: all
       properties:
@@ -27,18 +20,10 @@ spring:
         max.block.ms: 5000
         request.timeout.ms: 5000
         delivery.timeout.ms: 10000
-    # Consumidor (quem lê).
-    # group-id: o "nome do leitor". O Kafka guarda, por grupo, até onde ele já leu
-    # (o offset). Cada serviço tem o seu grupo e lê tudo de forma independente.
-    # auto-offset-reset=earliest: na primeira vez, começa do início do tópico.
-    # enable-auto-commit=false: o Kafka NÃO marca como lido sozinho; nós avisamos.
     consumer:
       group-id: inventory-service
       auto-offset-reset: earliest
       enable-auto-commit: false
-    # manual_immediate: o código chama ack() para dizer "pode avançar o offset",
-    # e só fazemos isso depois do commit no banco. Se o serviço cair antes, a
-    # mensagem é entregue de novo (e a inbox evita o efeito duplicado).
     listener:
       ack-mode: manual_immediate
 

@@ -9,8 +9,6 @@ import org.springframework.data.repository.query.Param;
 
 interface InboxMessageJpaRepository extends JpaRepository<InboxMessageEntity, UUID> {
 
-    // ON CONFLICT DO NOTHING: se o messageId já existe (mensagem repetida), não grava
-    // e devolve 0 linhas afetadas, sem erro. É assim que detectamos o duplicado.
     @Modifying
     @Query(value = """
             INSERT INTO inbox_message (message_id, type, consumed_at)

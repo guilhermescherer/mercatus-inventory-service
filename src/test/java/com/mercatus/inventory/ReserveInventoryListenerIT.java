@@ -26,8 +26,6 @@ import org.testcontainers.kafka.KafkaContainer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-// Testa o Inventory reagindo ao comando ReserveInventory que chega pelo Kafka:
-// o teste faz o papel do Order (envia o comando) e lê a resposta no tópico de eventos.
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "inventory.messaging.outbox.poll-interval-ms=200")
@@ -165,9 +163,6 @@ class ReserveInventoryListenerIT {
         assertThat(awaitReply(commandId).type()).isEqualTo("inventory.InventoryReserved");
     }
 
-    // Falha técnica: a tabela inbox "some" por alguns segundos. O processamento falha,
-    // o offset não avança e o Kafka entrega a mesma mensagem de novo. Quando a tabela
-    // volta, a mensagem é processada uma única vez.
     @Test
     void technicalFailureIsRetriedUntilTheDatabaseRecovers() {
         String sku = fixture.uniqueSkuCode();

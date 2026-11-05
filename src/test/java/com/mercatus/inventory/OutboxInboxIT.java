@@ -117,8 +117,6 @@ class OutboxInboxIT {
     }
 
     @Test
-    // Cenário principal da outbox: o Kafka "some" (pausamos o container), o negócio
-    // continua gravando, e quando o Kafka volta a mensagem sai sozinha.
     void messageCommittedWhileBrokerIsUnreachableIsPublishedWhenItReturns() {
         var docker = kafka.getDockerClient();
         UUID orderId = UUID.randomUUID();
@@ -146,7 +144,6 @@ class OutboxInboxIT {
     }
 
     @Test
-    // Mesmo messageId duas vezes: só a primeira é aceita.
     void inboxIgnoresRepeatedMessageId() {
         UUID messageId = UUID.randomUUID();
 

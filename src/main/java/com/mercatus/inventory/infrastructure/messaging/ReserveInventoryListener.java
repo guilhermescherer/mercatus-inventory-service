@@ -18,19 +18,6 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-// O consumidor do comando ReserveInventory, enviado pelo Order.
-//
-// Passo a passo de cada mensagem:
-//  1. lê e valida o envelope (fora do contrato → ContractViolationException → o
-//     DefaultErrorHandler loga e segue, sem tentar de novo);
-//  2. abre UMA transação no banco e, dentro dela:
-//     a. registra o messageId na inbox (já existia? mensagem repetida → não faz nada);
-//     b. tenta reservar o estoque;
-//     c. grava a resposta (reservado / sem estoque) na outbox;
-//  3. só depois do commit chama ack(), que avisa o Kafka para avançar o offset.
-//
-// Se o serviço cair entre o commit e o ack, o Kafka entrega a mesma mensagem de novo;
-// a inbox reconhece o messageId e nada é repetido.
 @Component
 class ReserveInventoryListener {
 
@@ -56,15 +43,10 @@ class ReserveInventoryListener {
         this.properties = properties;
     }
 
-    // @KafkaListener: o Spring cria um consumidor que fica lendo este tópico e chama
-    // este método para cada mensagem. O grupo (inventory-service) vem do application.yml.
-    // Acknowledgment: o "botão" para avançar o offset; só apertamos depois do commit.
     @KafkaListener(topics = "${inventory.messaging.topics.commands}")
     void onMessage(ConsumerRecord<String, String> record, Acknowledgment ack) {
         MessageEnvelope envelope = reader.readEnvelope(record.value());
 
-        // O MDC coloca o correlationId em todas as linhas de log deste processamento,
-        // para seguir o mesmo pedido nos logs do Order e do Inventory.
         MDC.put("correlationId", envelope.correlationId());
         try {
             if (!ReserveInventoryPayload.TYPE.equals(envelope.type())) {
@@ -105,8 +87,6 @@ class ReserveInventoryListener {
         return outcome;
     }
 
-    // A resposta carrega o mesmo correlationId (mesmo fluxo de negócio) e, como
-    // causationId, o messageId do comando que a provocou.
     private OutgoingMessage reply(MessageEnvelope command, ReserveInventoryPayload payload, Outcome outcome) {
         String orderId = payload.orderId().toString();
 

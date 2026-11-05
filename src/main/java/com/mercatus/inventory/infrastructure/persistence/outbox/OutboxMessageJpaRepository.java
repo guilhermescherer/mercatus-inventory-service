@@ -23,9 +23,6 @@ interface OutboxMessageJpaRepository extends JpaRepository<OutboxMessageEntity, 
             @Param("payload") String payload,
             @Param("createdAt") Instant createdAt);
 
-    // FOR UPDATE: trava as linhas lidas até o fim da transação.
-    // SKIP LOCKED: se outra instância do serviço já travou uma linha, pula ela em vez
-    // de esperar. Com duas instâncias rodando, cada uma pega mensagens diferentes.
     @Query(value = """
             SELECT * FROM outbox_message
             WHERE published_at IS NULL

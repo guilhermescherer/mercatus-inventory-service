@@ -19,8 +19,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 
-// Ferramenta de teste: um consumidor Kafka "de verdade", com grupo próprio e
-// aleatório, para ler o tópico desde o início e conferir o que o serviço publicou.
 public final class KafkaProbe implements AutoCloseable {
 
     private final KafkaConsumer<String, String> consumer;

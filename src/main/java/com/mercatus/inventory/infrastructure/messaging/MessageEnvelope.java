@@ -6,10 +6,6 @@ import tools.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.util.UUID;
 
-// Formato comum de toda mensagem trocada pelo Kafka (comandos e eventos).
-// ignoreUnknown: campos novos que o produtor venha a adicionar são ignorados, para
-// que o produtor possa evoluir sem quebrar este consumidor. Já os campos que este
-// serviço precisa são obrigatórios (validados no construtor abaixo).
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record MessageEnvelope(
         UUID messageId,
