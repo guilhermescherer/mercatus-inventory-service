@@ -21,12 +21,14 @@ mvn -f ../mercatus-parent/pom.xml install
 ```
 
 O Maven precisa usar JDK 25; ajuste `JAVA_HOME` antes do build se necessário.
-O Inventory ainda não possui `.mvn/settings.xml` próprio. Para consumir o parent
-remoto na estrutura guarda-chuva, configure `MAVEN_USERNAME` e `MAVEN_PASSWORD`
-e use o settings do Catalog explicitamente, por exemplo
-`mvn -s ../mercatus-catalog-service/.mvn/settings.xml verify`.
-As variáveis sozinhas não configuram o repositório. Consulte o
-[README do parent](../mercatus-parent/README.md) para resolução e publicação.
+O parent é consumido do GitHub Packages. Configure `MAVEN_USERNAME` e
+`MAVEN_PASSWORD` no ambiente com acesso de leitura ao pacote e use
+`mvn -s .mvn/settings.xml verify`; não coloque tokens em arquivos versionados.
+Consulte o [README do parent](../mercatus-parent/README.md) para resolução e publicação.
+
+O workflow `.github/workflows/ci.yml` executa em pushes e PRs para `main`, com
+JDK 25 e `mvn -B -s .mvn/settings.xml verify`. Ele usa `github.actor` e
+`GITHUB_TOKEN` com `packages: read`.
 
 Na pasta guarda-chuva, subir o PostgreSQL:
 
