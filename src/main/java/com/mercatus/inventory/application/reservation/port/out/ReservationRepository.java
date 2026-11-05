@@ -18,5 +18,7 @@ public interface ReservationRepository {
 
     boolean tryCreate(Reservation reservation);
 
+    void discardClaim(UUID reservationId);
+
     List<ReservationDeadline> findDueForExpiration(Instant now, ReservationDeadline after, int limit);
 }

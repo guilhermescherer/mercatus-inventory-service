@@ -49,6 +49,12 @@ class ReservationRepositoryAdapter implements ReservationRepository {
     }
 
     @Override
+    @Transactional
+    public void discardClaim(UUID reservationId) {
+        jpaRepository.deleteClaim(reservationId);
+    }
+
+    @Override
     public List<ReservationDeadline> findDueForExpiration(Instant now, ReservationDeadline after, int limit) {
         var page = PageRequest.of(0, limit);
         if (after == null) {

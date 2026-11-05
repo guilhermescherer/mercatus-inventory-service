@@ -50,6 +50,10 @@ public class StockItem {
         this.onHand = adjusted;
     }
 
+    public boolean canReserve(long quantity) {
+        return quantity > 0 && available() >= quantity;
+    }
+
     public void reserve(long quantity) {
         requirePositive(quantity);
         if (available() < quantity) {
