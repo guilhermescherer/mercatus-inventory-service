@@ -1,11 +1,9 @@
 package com.mercatus.inventory.infrastructure.messaging;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.mercatus.inventory.infrastructure.messaging.payload.InventoryReservedPayload;
 import com.mercatus.inventory.infrastructure.messaging.payload.ReserveInventoryPayload;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
 import java.util.List;
@@ -16,9 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ContractTest {
 
-    private final ObjectMapper objectMapper = JsonMapper.builder()
-            .addModule(new JavaTimeModule())
-            .build();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private final ContractReader reader = new ContractReader(objectMapper);
 
@@ -78,6 +74,49 @@ class ContractTest {
                 """.formatted(orderId);
 
         assertThatThrownBy(() -> reader.readReserveInventory(objectMapper.readTree(json)))
+                .isInstanceOf(ContractViolationException.class);
+    }
+
+    @Test
+    void readEnvelopeAcceptsCompleteMessage() {
+        UUID messageId = UUID.randomUUID();
+        String json = """
+                {
+                  "messageId": "%s",
+                  "type": "inventory.Example",
+                  "schemaVersion": 1,
+                  "occurredAt": "2026-10-27T20:00:00Z",
+                  "aggregateId": "order-1",
+                  "correlationId": "corr-1",
+                  "causationId": null,
+                  "payload": { "orderId": "order-1" },
+                  "extra": "ignored"
+                }
+                """.formatted(messageId);
+
+        var envelope = reader.readEnvelope(json);
+
+        assertThat(envelope.messageId()).isEqualTo(messageId);
+        assertThat(envelope.payload().get("orderId").asString()).isEqualTo("order-1");
+    }
+
+    @Test
+    void readEnvelopeReportsMissingFieldAsContractViolation() {
+        String json = """
+                { "type": "inventory.Example", "schemaVersion": 1, "occurredAt": "2026-10-27T20:00:00Z",
+                  "aggregateId": "order-1", "correlationId": "corr-1", "payload": {} }
+                """;
+
+        assertThatThrownBy(() -> reader.readEnvelope(json))
+                .isInstanceOf(ContractViolationException.class)
+                .hasMessage("messageId is required");
+    }
+
+    @Test
+    void readEnvelopeRejectsMalformedJson() {
+        assertThatThrownBy(() -> reader.readEnvelope("not-json"))
+                .isInstanceOf(ContractViolationException.class);
+        assertThatThrownBy(() -> reader.readEnvelope(" "))
                 .isInstanceOf(ContractViolationException.class);
     }
 }

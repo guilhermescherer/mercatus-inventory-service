@@ -63,6 +63,26 @@ Os testes de integração usam containers próprios de PostgreSQL 17.
 | `inventory.reservation.ttl` | `PT30M` |
 | `inventory.reservation.expiry-interval-ms` | `60000` |
 | `inventory.reservation.expiry-batch-size` | `100` |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` |
+| `INVENTORY_COMMANDS_TOPIC` | `inventory.commands.v1` |
+| `INVENTORY_EVENTS_TOPIC` | `inventory.events.v1` |
+| `OUTBOX_POLL_INTERVAL_MS` | `500` |
+| `OUTBOX_BATCH_SIZE` | `100` |
+| `OUTBOX_SEND_TIMEOUT` | `10s` |
+
+Mensagens para o Kafka são gravadas na tabela `outbox_message`, na mesma
+transação do dado de negócio, e enviadas por um publicador periódico; se o
+broker estiver fora, ficam pendentes e saem quando ele volta. Mensagens
+recebidas são registradas em `inbox_message` pelo `messageId`, para que uma
+repetição não tenha efeito. O serviço sobe mesmo sem Kafka. Para executar
+localmente com mensageria, suba também o perfil `events` do Platform.
+
+O Inventory consome o comando `ReserveInventory` do tópico `inventory.commands.v1`
+e responde em `inventory.events.v1` com `InventoryReserved` (`reservationId`,
+`expiresAt`) ou `InventoryReservationFailed` (`OUT_OF_STOCK`, inclusive para SKU sem
+estoque cadastrado). A reserva continua tudo-ou-nada e idempotente por `orderId`;
+o mesmo `messageId` recebido de novo é ignorado. Falhas técnicas no processamento
+fazem a mensagem ser entregue de novo, com espera crescente.
 
 Propriedades Spring podem ser fornecidas por argumentos `--nome=valor`.
 O perfil `local` desativa a saída estruturada de logs para facilitar a leitura.
