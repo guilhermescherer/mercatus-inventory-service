@@ -20,6 +20,10 @@ interface ReservationJpaRepository extends JpaRepository<ReservationEntity, UUID
     Optional<ReservationEntity> findByOrderId(UUID orderId);
 
     @Modifying
+    @Query(value = "delete from reservation where id = :id", nativeQuery = true)
+    int deleteClaim(@Param("id") UUID id);
+
+    @Modifying
     @Query(value = """
             insert into reservation (id, order_id, status, created_at, expires_at)
             values (:id, :orderId, :status, :createdAt, :expiresAt)

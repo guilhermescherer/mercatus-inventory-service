@@ -21,12 +21,14 @@ mvn -f ../mercatus-parent/pom.xml install
 ```
 
 O Maven precisa usar JDK 25; ajuste `JAVA_HOME` antes do build se necessário.
-O Inventory ainda não possui `.mvn/settings.xml` próprio. Para consumir o parent
-remoto na estrutura guarda-chuva, configure `MAVEN_USERNAME` e `MAVEN_PASSWORD`
-e use o settings do Catalog explicitamente, por exemplo
-`mvn -s ../mercatus-catalog-service/.mvn/settings.xml verify`.
-As variáveis sozinhas não configuram o repositório. Consulte o
-[README do parent](../mercatus-parent/README.md) para resolução e publicação.
+O parent é consumido do GitHub Packages. Configure `MAVEN_USERNAME` e
+`MAVEN_PASSWORD` no ambiente com acesso de leitura ao pacote e use
+`mvn -s .mvn/settings.xml verify`; não coloque tokens em arquivos versionados.
+Consulte o [README do parent](../mercatus-parent/README.md) para resolução e publicação.
+
+O workflow `.github/workflows/ci.yml` executa em pushes e PRs para `main`, com
+JDK 25 e `mvn -B -s .mvn/settings.xml verify`. Ele usa `github.actor` e
+`GITHUB_TOKEN` com `packages: read`.
 
 Na pasta guarda-chuva, subir o PostgreSQL:
 
@@ -63,6 +65,26 @@ Os testes de integração usam containers próprios de PostgreSQL 17.
 | `inventory.reservation.ttl` | `PT30M` |
 | `inventory.reservation.expiry-interval-ms` | `60000` |
 | `inventory.reservation.expiry-batch-size` | `100` |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` |
+| `INVENTORY_COMMANDS_TOPIC` | `inventory.commands.v1` |
+| `INVENTORY_EVENTS_TOPIC` | `inventory.events.v1` |
+| `OUTBOX_POLL_INTERVAL_MS` | `500` |
+| `OUTBOX_BATCH_SIZE` | `100` |
+| `OUTBOX_SEND_TIMEOUT` | `10s` |
+
+Mensagens para o Kafka são gravadas na tabela `outbox_message`, na mesma
+transação do dado de negócio, e enviadas por um publicador periódico; se o
+broker estiver fora, ficam pendentes e saem quando ele volta. Mensagens
+recebidas são registradas em `inbox_message` pelo `messageId`, para que uma
+repetição não tenha efeito. O serviço sobe mesmo sem Kafka. Para executar
+localmente com mensageria, suba também o perfil `events` do Platform.
+
+O Inventory consome o comando `ReserveInventory` do tópico `inventory.commands.v1`
+e responde em `inventory.events.v1` com `InventoryReserved` (`reservationId`,
+`expiresAt`) ou `InventoryReservationFailed` (`OUT_OF_STOCK`, inclusive para SKU sem
+estoque cadastrado). A reserva continua tudo-ou-nada e idempotente por `orderId`;
+o mesmo `messageId` recebido de novo é ignorado. Falhas técnicas no processamento
+fazem a mensagem ser entregue de novo, com espera crescente.
 
 Propriedades Spring podem ser fornecidas por argumentos `--nome=valor`.
 O perfil `local` desativa a saída estruturada de logs para facilitar a leitura.
@@ -184,5 +206,3 @@ chegou aos testes de integração, mas Testcontainers não conseguiu
 acessar o socket Docker (`Operation not permitted`). Os testes de migrations,
 SQL de locks e concorrência foram escritos e compilados; a execução com
 PostgreSQL real permanece pendente. A fase 4 ainda não está declarada concluída.
-Os resultados e as pendências estão nas
-[evidências da entrega](../docs/specs/inventory-phase4/validation.md).

@@ -116,4 +116,14 @@ class StockItemTest {
         assertThat(item.reserved()).isEqualTo(2);
         assertThat(item.committed()).isEqualTo(3);
     }
+
+    @Test
+    void canReserveMatchesWhatReserveAccepts() {
+        StockItem item = StockItem.reconstitute("SKU-1", 10, 3, 2, 0L);
+
+        assertThat(item.canReserve(5)).isTrue();
+        assertThat(item.canReserve(6)).isFalse();
+        assertThat(item.canReserve(0)).isFalse();
+        assertThat(item.reserved()).isEqualTo(3);
+    }
 }

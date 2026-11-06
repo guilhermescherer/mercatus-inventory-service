@@ -1,6 +1,6 @@
 package com.mercatus.inventory.infrastructure.scheduling;
 
-import com.mercatus.inventory.application.reservation.port.in.ExpireReservationsUseCase;
+import com.mercatus.inventory.application.reservation.port.in.ExpireDueReservationsUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,9 +11,9 @@ class ReservationExpiryJob {
 
     private static final Logger log = LoggerFactory.getLogger(ReservationExpiryJob.class);
 
-    private final ExpireReservationsUseCase expireReservations;
+    private final ExpireDueReservationsUseCase expireReservations;
 
-    ReservationExpiryJob(ExpireReservationsUseCase expireReservations) {
+    ReservationExpiryJob(ExpireDueReservationsUseCase expireReservations) {
         this.expireReservations = expireReservations;
     }
 

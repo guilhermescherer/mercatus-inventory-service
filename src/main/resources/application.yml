@@ -11,6 +11,21 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        request.timeout.ms: 5000
+        delivery.timeout.ms: 10000
+    consumer:
+      group-id: inventory-service
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      ack-mode: manual_immediate
 
 server:
   servlet:
@@ -29,3 +44,13 @@ management:
   endpoint:
     health:
       show-details: always
+
+inventory:
+  messaging:
+    topics:
+      commands: ${INVENTORY_COMMANDS_TOPIC:inventory.commands.v1}
+      events: ${INVENTORY_EVENTS_TOPIC:inventory.events.v1}
+    outbox:
+      poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:500}
+      batch-size: ${OUTBOX_BATCH_SIZE:100}
+      send-timeout: ${OUTBOX_SEND_TIMEOUT:10s}
