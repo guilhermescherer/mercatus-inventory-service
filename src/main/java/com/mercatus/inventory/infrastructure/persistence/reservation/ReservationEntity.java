@@ -27,6 +27,9 @@ class ReservationEntity {
     @Column(name = "order_id", nullable = false, unique = true)
     private UUID orderId;
 
+    @Column(name = "correlation_id")
+    private String correlationId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ReservationStatus status;
@@ -58,6 +61,14 @@ class ReservationEntity {
 
     void setOrderId(UUID orderId) {
         this.orderId = orderId;
+    }
+
+    String getCorrelationId() {
+        return correlationId;
+    }
+
+    void setCorrelationId(String correlationId) {
+        this.correlationId = correlationId;
     }
 
     ReservationStatus getStatus() {

@@ -1,6 +1,7 @@
 package com.mercatus.inventory.application.reservation.usecase;
 
 import com.mercatus.inventory.application.reservation.port.in.ExpireReservationUseCase;
+import com.mercatus.inventory.application.reservation.port.out.ReservationEventPublisher;
 import com.mercatus.inventory.application.reservation.port.out.ReservationRepository;
 import com.mercatus.inventory.application.reservation.usecase.support.StockLineLocker;
 import com.mercatus.inventory.domain.stock.StockItem;
@@ -17,12 +18,14 @@ public class ExpireReservationService implements ExpireReservationUseCase {
 
     private final ReservationRepository reservationRepository;
     private final StockLineLocker stockLineLocker;
+    private final ReservationEventPublisher events;
     private final Clock clock;
 
     public ExpireReservationService(ReservationRepository reservationRepository,
-                                    StockLineLocker stockLineLocker, Clock clock) {
+                                    StockLineLocker stockLineLocker, ReservationEventPublisher events, Clock clock) {
         this.reservationRepository = reservationRepository;
         this.stockLineLocker = stockLineLocker;
+        this.events = events;
         this.clock = clock;
     }
 
@@ -37,6 +40,7 @@ public class ExpireReservationService implements ExpireReservationUseCase {
         due.expire();
         stockLineLocker.lockApplyAndSave(due.lines(), StockItem::releaseReserved);
         reservationRepository.save(due);
+        events.expired(due);
         return true;
     }
 }

@@ -45,7 +45,8 @@ class ReservationRepositoryAdapter implements ReservationRepository {
     @Transactional
     public boolean tryCreate(Reservation reservation) {
         return jpaRepository.insertIfAbsent(reservation.id(), reservation.orderId(),
-                reservation.status().name(), reservation.createdAt(), reservation.expiresAt()) == 1;
+                reservation.correlationId().orElse(null), reservation.status().name(),
+                reservation.createdAt(), reservation.expiresAt()) == 1;
     }
 
     @Override

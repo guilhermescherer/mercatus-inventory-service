@@ -18,13 +18,24 @@ class ReservationTest {
 
     private Reservation reserved() {
         return Reservation.create(UUID.randomUUID(), UUID.randomUUID(),
-                List.of(new ReservationLine("SKU-A", 1), new ReservationLine("SKU-B", 2)),
+                List.of(new ReservationLine("SKU-A", 1), new ReservationLine("SKU-B", 2)), "corr-1",
                 Duration.ofMinutes(30), Instant.parse("2026-01-01T00:00:00Z"));
     }
 
     @Test
+    void createKeepsOptionalCorrelation() {
+        assertThat(reserved().correlationId()).contains("corr-1");
+        assertThat(Reservation.create(UUID.randomUUID(), UUID.randomUUID(),
+                List.of(new ReservationLine("SKU-A", 1)), null, Duration.ofMinutes(30), Instant.now())
+                .correlationId()).isEmpty();
+        assertThatThrownBy(() -> Reservation.create(UUID.randomUUID(), UUID.randomUUID(),
+                List.of(new ReservationLine("SKU-A", 1)), " ", Duration.ofMinutes(30), Instant.now()))
+                .isInstanceOf(DomainRuleException.class);
+    }
+
+    @Test
     void createRequiresAtLeastOneLine() {
-        assertThatThrownBy(() -> Reservation.create(UUID.randomUUID(), UUID.randomUUID(), List.of(),
+        assertThatThrownBy(() -> Reservation.create(UUID.randomUUID(), UUID.randomUUID(), List.of(), null,
                 Duration.ofMinutes(30), Instant.now()))
                 .isInstanceOf(DomainRuleException.class);
     }
@@ -32,7 +43,7 @@ class ReservationTest {
     @Test
     void createRejectsDuplicateSku() {
         assertThatThrownBy(() -> Reservation.create(UUID.randomUUID(), UUID.randomUUID(),
-                List.of(new ReservationLine("SKU-A", 1), new ReservationLine("SKU-A", 2)),
+                List.of(new ReservationLine("SKU-A", 1), new ReservationLine("SKU-A", 2)), null,
                 Duration.ofMinutes(30), Instant.now()))
                 .isInstanceOf(DomainRuleException.class);
     }
@@ -127,7 +138,7 @@ class ReservationTest {
     private Reservation inStatus(ReservationStatus status) {
         Reservation reservation = reserved();
         return Reservation.reconstitute(reservation.id(), reservation.orderId(), reservation.lines(),
-                status, reservation.createdAt(), reservation.expiresAt());
+                reservation.correlationId().orElse(null), status, reservation.createdAt(), reservation.expiresAt());
     }
 
     private void apply(Reservation reservation, String action) {

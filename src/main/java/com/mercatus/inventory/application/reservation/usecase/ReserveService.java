@@ -27,7 +27,7 @@ public class ReserveService implements ReserveUseCase {
                 .map(line -> new ReservationLine(line.skuCode(), line.quantity()))
                 .toList();
 
-        return switch (creator.create(command.orderId(), lines)) {
+        return switch (creator.create(command.orderId(), lines, null)) {
             case Result.Created created -> created.reservation().id();
             case Result.UnknownStockItem unknown ->
                     throw new ResourceNotFoundException("One or more stock items were not found");

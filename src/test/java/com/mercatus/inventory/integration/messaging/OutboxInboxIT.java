@@ -1,5 +1,6 @@
 package com.mercatus.inventory.integration.messaging;
 
+import com.mercatus.inventory.infrastructure.messaging.contract.OutboundMessageType;
 import com.mercatus.inventory.infrastructure.messaging.contract.ContractReader;
 import com.mercatus.inventory.infrastructure.messaging.contract.MessageEnvelope;
 import com.mercatus.inventory.infrastructure.messaging.inbox.InboxStore;
@@ -86,7 +87,7 @@ class OutboxInboxIT {
 
             var read = reader.readEnvelope(record.value());
             assertThat(read.messageId()).isEqualTo(envelope.messageId());
-            assertThat(read.type()).isEqualTo("inventory.Example");
+            assertThat(read.type()).isEqualTo("inventory.InventoryReserved");
             assertThat(read.schemaVersion()).isEqualTo(1);
             assertThat(read.aggregateId()).isEqualTo(orderId.toString());
             assertThat(read.correlationId()).isEqualTo("corr-" + orderId);
@@ -174,7 +175,7 @@ class OutboxInboxIT {
     }
 
     private OutgoingMessage message(UUID orderId) {
-        return new OutgoingMessage("inventory.Example", 1, orderId.toString(), "corr-" + orderId, "cause-1",
+        return new OutgoingMessage(OutboundMessageType.INVENTORY_RESERVED, orderId.toString(), "corr-" + orderId, "cause-1",
                 Map.of("orderId", orderId.toString()));
     }
 

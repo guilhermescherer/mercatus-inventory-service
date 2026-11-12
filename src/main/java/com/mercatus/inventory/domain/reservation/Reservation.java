@@ -5,6 +5,7 @@ import com.mercatus.inventory.domain.exception.DomainRuleException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public class Reservation {
@@ -12,21 +13,24 @@ public class Reservation {
     private final UUID id;
     private final UUID orderId;
     private final List<ReservationLine> lines;
+    private final String correlationId;
     private ReservationStatus status;
     private final Instant createdAt;
     private final Instant expiresAt;
 
-    private Reservation(UUID id, UUID orderId, List<ReservationLine> lines,
+    private Reservation(UUID id, UUID orderId, List<ReservationLine> lines, String correlationId,
                         ReservationStatus status, Instant createdAt, Instant expiresAt) {
         this.id = id;
         this.orderId = orderId;
         this.lines = List.copyOf(lines);
+        this.correlationId = correlationId;
         this.status = status;
         this.createdAt = createdAt;
         this.expiresAt = expiresAt;
     }
 
-    public static Reservation create(UUID id, UUID orderId, List<ReservationLine> lines, Duration ttl, Instant now) {
+    public static Reservation create(UUID id, UUID orderId, List<ReservationLine> lines, String correlationId,
+                                     Duration ttl, Instant now) {
         if (orderId == null) {
             throw new DomainRuleException("Order ID is required");
         }
@@ -40,13 +44,16 @@ public class Reservation {
         if (distinctSkus != lines.size()) {
             throw new DomainRuleException("Reservation must not repeat the same SKU");
         }
-        return new Reservation(id, orderId, lines,
+        if (correlationId != null && correlationId.isBlank()) {
+            throw new DomainRuleException("Correlation ID must not be blank");
+        }
+        return new Reservation(id, orderId, lines, correlationId,
                 ReservationStatus.RESERVED, now, now.plus(ttl));
     }
 
-    public static Reservation reconstitute(UUID id, UUID orderId, List<ReservationLine> lines,
+    public static Reservation reconstitute(UUID id, UUID orderId, List<ReservationLine> lines, String correlationId,
                                            ReservationStatus status, Instant createdAt, Instant expiresAt) {
-        return new Reservation(id, orderId, lines, status, createdAt, expiresAt);
+        return new Reservation(id, orderId, lines, correlationId, status, createdAt, expiresAt);
     }
 
     public void confirm() {
@@ -65,15 +72,17 @@ public class Reservation {
         this.status = ReservationStatus.CONSUMED;
     }
 
+    public boolean canRelease() {
+        return status == ReservationStatus.RESERVED
+                || status == ReservationStatus.CONFIRMED
+                || status == ReservationStatus.RELEASED;
+    }
+
     public void release() {
-        if (status == ReservationStatus.RESERVED || status == ReservationStatus.CONFIRMED) {
-            this.status = ReservationStatus.RELEASED;
-            return;
+        if (!canRelease()) {
+            throw new DomainRuleException("Cannot release a reservation in status " + status);
         }
-        if (status == ReservationStatus.RELEASED) {
-            return;
-        }
-        throw new DomainRuleException("Cannot release a reservation in status " + status);
+        this.status = ReservationStatus.RELEASED;
     }
 
     public void expire() {
@@ -108,6 +117,10 @@ public class Reservation {
 
     public List<ReservationLine> lines() {
         return lines;
+    }
+
+    public Optional<String> correlationId() {
+        return Optional.ofNullable(correlationId);
     }
 
     public ReservationStatus status() {

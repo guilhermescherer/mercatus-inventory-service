@@ -8,7 +8,7 @@ public interface ReserveForOrderUseCase {
 
     Outcome reserve(ReserveForOrderCommand command);
 
-    record ReserveForOrderCommand(UUID orderId, List<Line> lines) {
+    record ReserveForOrderCommand(UUID orderId, List<Line> lines, String correlationId) {
 
         public record Line(String skuCode, long quantity) {
         }

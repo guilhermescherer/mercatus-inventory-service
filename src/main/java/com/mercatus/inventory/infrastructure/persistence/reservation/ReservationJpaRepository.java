@@ -25,12 +25,12 @@ interface ReservationJpaRepository extends JpaRepository<ReservationEntity, UUID
 
     @Modifying
     @Query(value = """
-            insert into reservation (id, order_id, status, created_at, expires_at)
-            values (:id, :orderId, :status, :createdAt, :expiresAt)
+            insert into reservation (id, order_id, correlation_id, status, created_at, expires_at)
+            values (:id, :orderId, :correlationId, :status, :createdAt, :expiresAt)
             on conflict (order_id) do nothing
             """, nativeQuery = true)
     int insertIfAbsent(@Param("id") UUID id, @Param("orderId") UUID orderId,
-                       @Param("status") String status, @Param("createdAt") Instant createdAt,
+                       @Param("correlationId") String correlationId, @Param("status") String status, @Param("createdAt") Instant createdAt,
                        @Param("expiresAt") Instant expiresAt);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

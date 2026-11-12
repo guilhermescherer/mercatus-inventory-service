@@ -1,5 +1,6 @@
 package com.mercatus.inventory.infrastructure.messaging.contract;
 
+import com.mercatus.inventory.infrastructure.messaging.contract.payload.ReleaseReservationPayload;
 import com.mercatus.inventory.infrastructure.messaging.contract.payload.ReserveInventoryPayload;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -40,6 +41,15 @@ public final class ContractReader {
                 throw new ContractViolationException("quantity must be positive");
             }
         }
+
+        return value;
+    }
+
+    public ReleaseReservationPayload readReleaseReservation(JsonNode payload) {
+        var value = convert(payload, ReleaseReservationPayload.class);
+
+        require(value.orderId(), "orderId");
+        require(value.reservationId(), "reservationId");
 
         return value;
     }
