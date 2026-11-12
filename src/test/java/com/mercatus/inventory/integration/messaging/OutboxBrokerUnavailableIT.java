@@ -1,5 +1,6 @@
 package com.mercatus.inventory.integration.messaging;
 
+import com.mercatus.inventory.infrastructure.messaging.contract.OutboundMessageType;
 import com.mercatus.inventory.infrastructure.messaging.outbox.OutboxStore;
 import com.mercatus.inventory.infrastructure.messaging.outbox.OutboxWriter;
 import com.mercatus.inventory.infrastructure.messaging.outbox.OutboxWriter.OutgoingMessage;
@@ -49,7 +50,7 @@ class OutboxBrokerUnavailableIT {
         UUID orderId = UUID.randomUUID();
 
         transactions.executeWithoutResult(status -> writer.enqueue("inventory.events.v1",
-                new OutgoingMessage("inventory.Example", 1, orderId.toString(), "corr-1", null,
+                new OutgoingMessage(OutboundMessageType.INVENTORY_RESERVED, orderId.toString(), "corr-1", null,
                         Map.of("orderId", orderId.toString()))));
 
         await().during(Duration.ofSeconds(4)).atMost(Duration.ofSeconds(6))

@@ -31,7 +31,7 @@ public class ReserveForOrderService implements ReserveForOrderUseCase {
                 .map(line -> new ReservationLine(line.getKey(), line.getValue()))
                 .toList();
 
-        return switch (creator.create(command.orderId(), lines)) {
+        return switch (creator.create(command.orderId(), lines, command.correlationId())) {
             case Result.Created created ->
                     new Outcome.Reserved(created.reservation().id(), created.reservation().expiresAt());
             case Result.UnknownStockItem unknown -> new Outcome.OutOfStock();

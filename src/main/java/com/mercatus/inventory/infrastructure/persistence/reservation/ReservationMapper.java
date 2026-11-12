@@ -15,6 +15,7 @@ final class ReservationMapper {
         ReservationEntity entity = new ReservationEntity();
         entity.setId(reservation.id());
         entity.setOrderId(reservation.orderId());
+        entity.setCorrelationId(reservation.correlationId().orElse(null));
         entity.setStatus(reservation.status());
         entity.setCreatedAt(reservation.createdAt());
         entity.setExpiresAt(reservation.expiresAt());
@@ -33,6 +34,7 @@ final class ReservationMapper {
                 entity.getId(),
                 entity.getOrderId(),
                 lines,
+                entity.getCorrelationId(),
                 entity.getStatus(),
                 entity.getCreatedAt(),
                 entity.getExpiresAt());

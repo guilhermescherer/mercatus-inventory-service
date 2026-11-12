@@ -1,6 +1,7 @@
 package com.mercatus.inventory.infrastructure.messaging.outbox;
 
 import com.mercatus.inventory.infrastructure.messaging.contract.MessageEnvelope;
+import com.mercatus.inventory.infrastructure.messaging.contract.OutboundMessageType;
 import java.time.Clock;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -30,8 +31,8 @@ public class OutboxWriter {
     public MessageEnvelope enqueue(String topic, OutgoingMessage message) {
         var envelope = new MessageEnvelope(
                 identifiers.get(),
-                message.type(),
-                message.schemaVersion(),
+                message.type().value(),
+                message.type().schemaVersion(),
                 clock.instant().truncatedTo(MICROS),
                 message.aggregateId(),
                 message.correlationId(),
@@ -44,7 +45,7 @@ public class OutboxWriter {
         return envelope;
     }
 
-    public record OutgoingMessage(String type, int schemaVersion, String aggregateId, String correlationId,
+    public record OutgoingMessage(OutboundMessageType type, String aggregateId, String correlationId,
             String causationId, Object payload) {
     }
 }

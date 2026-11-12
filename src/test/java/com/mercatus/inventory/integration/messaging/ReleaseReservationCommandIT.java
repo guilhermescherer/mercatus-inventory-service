@@ -1,5 +1,6 @@
 package com.mercatus.inventory.integration.messaging;
 
+import com.mercatus.inventory.application.reservation.port.in.ExpireReservationUseCase;
 import com.mercatus.inventory.infrastructure.messaging.contract.ContractReader;
 import com.mercatus.inventory.infrastructure.messaging.contract.MessageEnvelope;
 import com.mercatus.inventory.support.InventoryFixture;
@@ -28,9 +29,12 @@ import static org.awaitility.Awaitility.await;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "inventory.messaging.outbox.poll-interval-ms=200")
+        properties = {
+                "inventory.messaging.outbox.poll-interval-ms=200",
+                "inventory.reservation.expiry-interval-ms=3600000"
+        })
 @DirtiesContext
-class ReserveInventoryListenerIT {
+class ReleaseReservationCommandIT {
 
     private static final String COMMANDS = "inventory.commands.v1";
     private static final String EVENTS = "inventory.events.v1";
@@ -52,6 +56,9 @@ class ReserveInventoryListenerIT {
     @Autowired
     ContractReader reader;
 
+    @Autowired
+    ExpireReservationUseCase expireReservation;
+
     private InventoryFixture fixture;
     private KafkaProbe events;
 
@@ -72,47 +79,24 @@ class ReserveInventoryListenerIT {
     }
 
     @Test
-    void commandWithStockReservesAndRepliesInventoryReserved() {
+    void releaseReturnsReservedStockAndRepliesReservationReleased() {
         String sku = fixture.uniqueSkuCode();
         fixture.receive(sku, 5);
         UUID orderId = UUID.randomUUID();
+        String reservationId = fixture.reserve(orderId, sku, 2);
         UUID commandId = UUID.randomUUID();
 
-        send(command(commandId, orderId, sku, 2));
+        send(orderId, command(commandId, orderId, reservationId));
 
         MessageEnvelope reply = awaitReply(commandId);
-        assertThat(reply.type()).isEqualTo("inventory.InventoryReserved");
+        assertThat(reply.type()).isEqualTo("inventory.ReservationReleased");
         assertThat(reply.aggregateId()).isEqualTo(orderId.toString());
         assertThat(reply.correlationId()).isEqualTo("corr-" + orderId);
         assertThat(reply.payload().get("orderId").asString()).isEqualTo(orderId.toString());
-        assertThat(reply.payload().get("reservationId").asString()).isNotBlank();
-        assertThat(reply.payload().get("expiresAt").asString()).isNotBlank();
-        assertThat(reserved(sku)).isEqualTo(2);
-    }
-
-    @Test
-    void commandWithoutStockRepliesOutOfStockAndReservesNothing() {
-        String sku = fixture.uniqueSkuCode();
-        fixture.receive(sku, 1);
-        UUID orderId = UUID.randomUUID();
-        UUID commandId = UUID.randomUUID();
-
-        send(command(commandId, orderId, sku, 3));
-
-        MessageEnvelope reply = awaitReply(commandId);
-        assertThat(reply.type()).isEqualTo("inventory.InventoryReservationFailed");
-        assertThat(reply.payload().get("reason").asString()).isEqualTo("OUT_OF_STOCK");
+        assertThat(reply.payload().get("reservationId").asString()).isEqualTo(reservationId);
+        assertThat(fixture.reservationStatus(reservationId)).isEqualTo("RELEASED");
         assertThat(reserved(sku)).isZero();
-        assertThat(reservations(orderId)).isZero();
-    }
-
-    @Test
-    void unknownSkuIsTreatedAsOutOfStock() {
-        UUID commandId = UUID.randomUUID();
-
-        send(command(commandId, UUID.randomUUID(), fixture.uniqueSkuCode(), 1));
-
-        assertThat(awaitReply(commandId).type()).isEqualTo("inventory.InventoryReservationFailed");
+        assertThat(fixture.stock(sku).available()).isEqualTo(5);
     }
 
     @Test
@@ -120,113 +104,119 @@ class ReserveInventoryListenerIT {
         String sku = fixture.uniqueSkuCode();
         fixture.receive(sku, 5);
         UUID orderId = UUID.randomUUID();
+        String reservationId = fixture.reserve(orderId, sku, 2);
         UUID commandId = UUID.randomUUID();
-        String command = command(commandId, orderId, sku, 2);
+        String command = command(commandId, orderId, reservationId);
 
-        send(command);
-        send(command);
+        send(orderId, command);
+        send(orderId, command);
 
         awaitReply(commandId);
         await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(5))
                 .until(() -> replies(commandId).size() == 1);
-        assertThat(reserved(sku)).isEqualTo(2);
-        assertThat(reservations(orderId)).isEqualTo(1);
+        assertThat(reserved(sku)).isZero();
+        assertThat(fixture.stock(sku).available()).isEqualTo(5);
     }
 
     @Test
-    void differentCommandsForTheSameOrderShareOneReservation() {
+    void secondReleaseCommandRepliesAgainWithoutReturningStockTwice() {
         String sku = fixture.uniqueSkuCode();
         fixture.receive(sku, 5);
         UUID orderId = UUID.randomUUID();
+        String reservationId = fixture.reserve(orderId, sku, 2);
         UUID first = UUID.randomUUID();
         UUID second = UUID.randomUUID();
 
-        send(command(first, orderId, sku, 2));
-        send(command(second, orderId, sku, 2));
+        send(orderId, command(first, orderId, reservationId));
+        send(orderId, command(second, orderId, reservationId));
 
-        var firstReply = awaitReply(first);
-        var secondReply = awaitReply(second);
-        assertThat(secondReply.payload().get("reservationId").asString())
-                .isEqualTo(firstReply.payload().get("reservationId").asString());
-        assertThat(reserved(sku)).isEqualTo(2);
+        assertThat(awaitReply(first).type()).isEqualTo("inventory.ReservationReleased");
+        assertThat(awaitReply(second).type()).isEqualTo("inventory.ReservationReleased");
+        assertThat(reserved(sku)).isZero();
+        assertThat(fixture.stock(sku).available()).isEqualTo(5);
     }
 
     @Test
-    void brokenMessageIsSkippedWithoutBlockingTheNextOne() {
-        String sku = fixture.uniqueSkuCode();
-        fixture.receive(sku, 5);
-        UUID commandId = UUID.randomUUID();
-
-        KafkaProbe.send(kafka.getBootstrapServers(), COMMANDS, "broken", "{ not json");
-        send(command(commandId, UUID.randomUUID(), sku, 1));
-
-        assertThat(awaitReply(commandId).type()).isEqualTo("inventory.InventoryReserved");
-    }
-
-    @Test
-    void technicalFailureIsRetriedUntilTheDatabaseRecovers() {
+    void releaseOfExpiredReservationRepliesReservationExpiredWithoutTouchingStock() {
         String sku = fixture.uniqueSkuCode();
         fixture.receive(sku, 5);
         UUID orderId = UUID.randomUUID();
+        String reservationId = fixture.reserve(orderId, sku, 2);
+        fixture.makeDue(reservationId);
+        assertThat(expireReservation.expire(UUID.fromString(reservationId))).isTrue();
         UUID commandId = UUID.randomUUID();
 
-        jdbc.execute("ALTER TABLE inbox_message RENAME TO inbox_message_offline");
-        try {
-            send(command(commandId, orderId, sku, 2));
+        send(orderId, command(commandId, orderId, reservationId));
 
-            await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(5))
-                    .until(() -> replies(commandId).isEmpty());
-            assertThat(reservations(orderId)).isZero();
-        } finally {
-            jdbc.execute("ALTER TABLE inbox_message_offline RENAME TO inbox_message");
-        }
-
-        assertThat(awaitReply(commandId).type()).isEqualTo("inventory.InventoryReserved");
-        assertThat(reservations(orderId)).isEqualTo(1);
-        assertThat(reserved(sku)).isEqualTo(2);
+        MessageEnvelope reply = awaitReply(commandId);
+        assertThat(reply.type()).isEqualTo("inventory.ReservationExpired");
+        assertThat(reply.payload().get("reservationId").asString()).isEqualTo(reservationId);
+        assertThat(reply.payload().get("expiresAt").asString()).isNotBlank();
+        assertThat(fixture.reservationStatus(reservationId)).isEqualTo("EXPIRED");
+        assertThat(reserved(sku)).isZero();
+        assertThat(fixture.stock(sku).available()).isEqualTo(5);
     }
 
-    private void send(String command) {
-        String key = command.substring(command.indexOf("\"aggregateId\": \"") + 16).split("\"")[0];
-        KafkaProbe.send(kafka.getBootstrapServers(), COMMANDS, key, command);
+    @Test
+    void rejectedReleasesChangeNothingAndDoNotBlockTheNextCommand() {
+        String sku = fixture.uniqueSkuCode();
+        fixture.receive(sku, 5);
+        UUID orderId = UUID.randomUUID();
+        String reservationId = fixture.reserve(orderId, sku, 2);
+        UUID unknown = UUID.randomUUID();
+        UUID otherOrder = UUID.randomUUID();
+        UUID valid = UUID.randomUUID();
+
+        send(orderId, command(unknown, orderId, UUID.randomUUID().toString()));
+        send(otherOrder, command(otherOrder, otherOrder, reservationId));
+        send(orderId, command(valid, orderId, reservationId));
+
+        assertThat(awaitReply(valid).type()).isEqualTo("inventory.ReservationReleased");
+        assertThat(replies(unknown)).isEmpty();
+        assertThat(replies(otherOrder)).isEmpty();
+        assertThat(inboxed(unknown)).isTrue();
+        assertThat(inboxed(otherOrder)).isTrue();
     }
 
-    private String command(UUID messageId, UUID orderId, String sku, long quantity) {
+    private void send(UUID orderId, String command) {
+        KafkaProbe.send(kafka.getBootstrapServers(), COMMANDS, orderId.toString(), command);
+    }
+
+    private String command(UUID messageId, UUID orderId, String reservationId) {
         return """
                 {
                   "messageId": "%s",
-                  "type": "inventory.ReserveInventory",
+                  "type": "inventory.ReleaseReservation",
                   "schemaVersion": 1,
-                  "occurredAt": "2026-11-04T20:00:00Z",
+                  "occurredAt": "2026-11-06T20:00:00Z",
                   "aggregateId": "%s",
                   "correlationId": "corr-%s",
                   "causationId": null,
-                  "payload": { "orderId": "%s", "lines": [ { "skuCode": "%s", "quantity": %d } ] }
+                  "payload": { "orderId": "%s", "reservationId": "%s" }
                 }
-                """.formatted(messageId, orderId, orderId, orderId, sku, quantity);
+                """.formatted(messageId, orderId, orderId, orderId, reservationId);
     }
 
     private MessageEnvelope awaitReply(UUID commandId) {
-        var found = events.await(record -> repliesTo(record, commandId), 1,
-                Duration.ofSeconds(60));
+        var found = events.await(record -> repliesTo(record, commandId), 1, Duration.ofSeconds(60));
         assertThat(found).as("reply to command %s", commandId).isNotEmpty();
         return reader.readEnvelope(found.getFirst().value());
     }
 
     private List<ConsumerRecord<String, String>> replies(UUID commandId) {
-        return events.await(record -> repliesTo(record, commandId),
-                Integer.MAX_VALUE, Duration.ofMillis(300));
+        return events.await(record -> repliesTo(record, commandId), Integer.MAX_VALUE, Duration.ofMillis(300));
     }
 
     private boolean repliesTo(ConsumerRecord<String, String> record, UUID commandId) {
         return commandId.toString().equals(reader.readEnvelope(record.value()).causationId());
     }
 
-    private long reserved(String sku) {
-        return jdbc.queryForObject("SELECT reserved FROM stock_item WHERE sku_code = ?", Long.class, sku);
+    private boolean inboxed(UUID messageId) {
+        return jdbc.queryForObject("SELECT count(*) FROM inbox_message WHERE message_id = ?", Long.class,
+                messageId) == 1;
     }
 
-    private long reservations(UUID orderId) {
-        return jdbc.queryForObject("SELECT count(*) FROM reservation WHERE order_id = ?", Long.class, orderId);
+    private long reserved(String sku) {
+        return jdbc.queryForObject("SELECT reserved FROM stock_item WHERE sku_code = ?", Long.class, sku);
     }
 }

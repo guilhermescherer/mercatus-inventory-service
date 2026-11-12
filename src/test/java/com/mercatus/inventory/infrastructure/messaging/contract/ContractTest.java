@@ -1,6 +1,8 @@
 package com.mercatus.inventory.infrastructure.messaging.contract;
 
 import com.mercatus.inventory.infrastructure.messaging.contract.payload.InventoryReservedPayload;
+import com.mercatus.inventory.infrastructure.messaging.contract.payload.ReservationExpiredPayload;
+import com.mercatus.inventory.infrastructure.messaging.contract.payload.ReservationReleasedPayload;
 import com.mercatus.inventory.infrastructure.messaging.contract.payload.ReserveInventoryPayload;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -75,6 +77,43 @@ class ContractTest {
 
         assertThatThrownBy(() -> reader.readReserveInventory(objectMapper.readTree(json)))
                 .isInstanceOf(ContractViolationException.class);
+    }
+
+    @Test
+    void releasePayloadsRoundTrip() throws Exception {
+        var released = new ReservationReleasedPayload(UUID.randomUUID(), UUID.randomUUID());
+        var expired = new ReservationExpiredPayload(UUID.randomUUID(), UUID.randomUUID(),
+                Instant.parse("2026-11-06T20:30:00Z"));
+
+        assertThat(objectMapper.readValue(objectMapper.writeValueAsString(released),
+                ReservationReleasedPayload.class)).isEqualTo(released);
+        assertThat(objectMapper.readValue(objectMapper.writeValueAsString(expired),
+                ReservationExpiredPayload.class)).isEqualTo(expired);
+    }
+
+    @Test
+    void readReleaseReservationToleratesAdditiveFields() throws Exception {
+        UUID orderId = UUID.randomUUID();
+        UUID reservationId = UUID.randomUUID();
+        String json = """
+                { "orderId": "%s", "reservationId": "%s", "extra": true }
+                """.formatted(orderId, reservationId);
+
+        var read = reader.readReleaseReservation(objectMapper.readTree(json));
+
+        assertThat(read.orderId()).isEqualTo(orderId);
+        assertThat(read.reservationId()).isEqualTo(reservationId);
+    }
+
+    @Test
+    void readReleaseReservationRequiresReservationId() throws Exception {
+        String json = """
+                { "orderId": "%s" }
+                """.formatted(UUID.randomUUID());
+
+        assertThatThrownBy(() -> reader.readReleaseReservation(objectMapper.readTree(json)))
+                .isInstanceOf(ContractViolationException.class)
+                .hasMessage("reservationId is required");
     }
 
     @Test

@@ -38,13 +38,14 @@ public class ReservationCreator {
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public Result create(UUID orderId, List<ReservationLine> lines) {
+    public Result create(UUID orderId, List<ReservationLine> lines, String correlationId) {
         var existing = reservations.findByOrderId(orderId);
         if (existing.isPresent()) {
             return new Result.Created(existing.get());
         }
 
-        Reservation reservation = Reservation.create(identifiers.get(), orderId, lines, ttl, Instant.now(clock));
+        Reservation reservation = Reservation.create(identifiers.get(), orderId, lines, correlationId, ttl,
+                Instant.now(clock));
         if (!reservations.tryCreate(reservation)) {
             return new Result.Created(reservations.findByOrderId(orderId).orElseThrow());
         }

@@ -86,6 +86,23 @@ estoque cadastrado). A reserva continua tudo-ou-nada e idempotente por `orderId`
 o mesmo `messageId` recebido de novo é ignorado. Falhas técnicas no processamento
 fazem a mensagem ser entregue de novo, com espera crescente.
 
+No mesmo tópico de comandos chega `ReleaseReservation` (`orderId`,
+`reservationId`), que devolve o saldo pela mesma regra do endpoint REST de
+liberação e responde:
+
+| Situação da reserva | Resposta | Saldo |
+|---|---|---|
+| `RESERVED`, `CONFIRMED` ou já `RELEASED` | `ReservationReleased` | devolvido uma única vez |
+| `EXPIRED` | `ReservationExpired` | intocado (já voltou na expiração) |
+| inexistente, de outro pedido ou `CONSUMED` | nenhuma; log de erro | intocado |
+
+Quando a expiração automática vence uma reserva, o serviço grava
+`ReservationExpired` (`orderId`, `reservationId`, `expiresAt`) na outbox na mesma
+transação que devolve o saldo: ou as duas coisas acontecem, ou nenhuma. A reserva
+criada por mensagem guarda o `correlationId` do comando, e o evento de expiração o
+reaproveita; reservas criadas pela API usam o `orderId` como correlação. Os
+endpoints REST de reserva não publicam eventos.
+
 Propriedades Spring podem ser fornecidas por argumentos `--nome=valor`.
 O perfil `local` desativa a saída estruturada de logs para facilitar a leitura.
 A aplicação usa `/api/v1`, logs ECS, correlation ID e health do Actuator.
@@ -133,7 +150,7 @@ também com `201`, sem substituir os itens.
 A entrada cria o saldo do SKU quando necessário. Reservas e ajustes exigem
 saldo cadastrado no Inventory; não há consulta ao Catalog para validar o código.
 Embora a entrada responda `202`, o processamento atual ocorre na requisição,
-com transação no banco. Kafka, outbox e inbox entram na fase da saga.
+com transação no banco.
 
 Ajuste exige SKU existente, delta diferente de zero e motivo não vazio. Não pode
 reduzir estoque disponível abaixo de zero. Erros usam Problem Details: validação
