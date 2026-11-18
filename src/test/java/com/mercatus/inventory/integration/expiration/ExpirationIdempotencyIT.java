@@ -1,5 +1,10 @@
 package com.mercatus.inventory.integration.expiration;
 
+import com.mercatus.inventory.support.TestTokens;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.http.HttpHeaders;
+
 import com.mercatus.inventory.application.reservation.port.in.ExpireDueReservationsUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +32,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 class ExpirationIdempotencyIT {
 
+    @DynamicPropertySource
+    static void security(DynamicPropertyRegistry registry) {
+        TestTokens.register(registry);
+    }
+
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17");
@@ -42,6 +52,7 @@ class ExpirationIdempotencyIT {
         factory.setConnectTimeout(5000);
         factory.setReadTimeout(15000);
         return RestClient.builder().baseUrl("http://localhost:" + port + "/api/v1")
+                .defaultHeader(HttpHeaders.AUTHORIZATION, TestTokens.bearer(TestTokens.operator()))
                 .requestFactory(factory).build();
     }
 

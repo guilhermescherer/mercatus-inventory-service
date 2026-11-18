@@ -1,5 +1,10 @@
 package com.mercatus.inventory.integration.reservation;
 
+import com.mercatus.inventory.support.TestTokens;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.http.HttpHeaders;
+
 import com.mercatus.inventory.support.ConcurrentRequests;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,6 +28,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ReservationDeadlockIT {
 
+    @DynamicPropertySource
+    static void security(DynamicPropertyRegistry registry) {
+        TestTokens.register(registry);
+    }
+
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17");
@@ -36,6 +46,7 @@ class ReservationDeadlockIT {
         factory.setConnectTimeout(5000);
         factory.setReadTimeout(45000);
         RestClient client = RestClient.builder().baseUrl("http://localhost:" + port + "/api/v1")
+                .defaultHeader(HttpHeaders.AUTHORIZATION, TestTokens.bearer(TestTokens.operator()))
                 .requestFactory(factory).build();
         String a = "A-" + UUID.randomUUID();
         String b = "B-" + UUID.randomUUID();
