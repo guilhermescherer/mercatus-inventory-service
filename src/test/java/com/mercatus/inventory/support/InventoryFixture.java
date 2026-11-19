@@ -1,5 +1,7 @@
 package com.mercatus.inventory.support;
 
+import org.springframework.http.HttpHeaders;
+
 import com.mercatus.inventory.web.reservation.dto.ReservationResponse;
 import com.mercatus.inventory.web.stock.dto.StockResponse;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -22,6 +24,7 @@ public final class InventoryFixture {
         factory.setConnectTimeout(5000);
         factory.setReadTimeout(15000);
         this.client = RestClient.builder().baseUrl("http://localhost:" + port + "/api/v1")
+                .defaultHeader(HttpHeaders.AUTHORIZATION, TestTokens.bearer(TestTokens.operator()))
                 .requestFactory(factory).build();
         this.jdbc = jdbc;
     }

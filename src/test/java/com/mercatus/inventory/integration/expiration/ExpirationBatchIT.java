@@ -1,5 +1,9 @@
 package com.mercatus.inventory.integration.expiration;
 
+import com.mercatus.inventory.support.TestTokens;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+
 import com.mercatus.inventory.application.reservation.port.in.ExpireDueReservationsUseCase;
 import com.mercatus.inventory.support.InventoryFixture;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +31,11 @@ import static org.assertj.core.api.Assertions.assertThat;
         "inventory.reservation.expiry-batch-size=1"
 })
 class ExpirationBatchIT {
+
+    @DynamicPropertySource
+    static void security(DynamicPropertyRegistry registry) {
+        TestTokens.register(registry);
+    }
 
     @Container
     @ServiceConnection

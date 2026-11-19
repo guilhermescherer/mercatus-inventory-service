@@ -11,6 +11,12 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${MERCATUS_ISSUER_URI:http://localhost:8180/realms/mercatus}
+          jwk-set-uri: ${MERCATUS_ISSUER_URI:http://localhost:8180/realms/mercatus}/protocol/openid-connect/certs
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:

@@ -1,5 +1,9 @@
 package com.mercatus.inventory.integration.messaging;
 
+import com.mercatus.inventory.support.TestTokens;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+
 import com.mercatus.inventory.infrastructure.messaging.contract.ContractReader;
 import com.mercatus.inventory.infrastructure.messaging.contract.MessageEnvelope;
 import com.mercatus.inventory.support.InventoryFixture;
@@ -31,6 +35,11 @@ import static org.awaitility.Awaitility.await;
         properties = "inventory.messaging.outbox.poll-interval-ms=200")
 @DirtiesContext
 class ReserveInventoryCommandIT {
+
+    @DynamicPropertySource
+    static void security(DynamicPropertyRegistry registry) {
+        TestTokens.register(registry);
+    }
 
     private static final String COMMANDS = "inventory.commands.v1";
     private static final String EVENTS = "inventory.events.v1";

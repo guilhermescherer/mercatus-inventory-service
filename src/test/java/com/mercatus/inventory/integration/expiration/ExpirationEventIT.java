@@ -1,5 +1,9 @@
 package com.mercatus.inventory.integration.expiration;
 
+import com.mercatus.inventory.support.TestTokens;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+
 import com.mercatus.inventory.application.reservation.port.in.ExpireReservationUseCase;
 import com.mercatus.inventory.application.reservation.port.in.ReserveForOrderUseCase;
 import com.mercatus.inventory.application.reservation.port.in.ReserveForOrderUseCase.Outcome;
@@ -27,6 +31,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "inventory.reservation.expiry-interval-ms=3600000")
 class ExpirationEventIT {
+
+    @DynamicPropertySource
+    static void security(DynamicPropertyRegistry registry) {
+        TestTokens.register(registry);
+    }
 
     @Container
     @ServiceConnection

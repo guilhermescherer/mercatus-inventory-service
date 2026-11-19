@@ -8,7 +8,7 @@ reservas por pedido e movimentos imutáveis de estoque.
 Pré-requisitos: Java 25, Maven 3.9+, Docker com acesso ao daemon e acesso ao parent
 `com.mercatus:mercatus-parent:1.0.0` no GitHub Packages ou no repositório Maven local.
 
-O serviço usa Spring Boot 4.1, Spring MVC, JPA, Flyway, PostgreSQL 17 e springdoc.
+O serviço usa Spring Boot 4.1, Spring MVC, Spring Security (OAuth2 Resource Server, JWT), JPA, Flyway, PostgreSQL 17, Kafka e springdoc.
 Os testes usam JUnit Jupiter 6, AssertJ, ArchUnit e Testcontainers. A estrutura
 segue Ports & Adapters: domínio puro em `domain`, casos de uso e portas em
 `application`, persistência e scheduler em `infrastructure` e API em `web`.
@@ -30,10 +30,10 @@ O workflow `.github/workflows/ci.yml` executa em pushes e PRs para `main`, com
 JDK 25 e `mvn -B -s .mvn/settings.xml verify`. Ele usa `github.actor` e
 `GITHUB_TOKEN` com `packages: read`.
 
-Na pasta guarda-chuva, subir o PostgreSQL:
+Na pasta guarda-chuva, subir PostgreSQL, Kafka e Keycloak:
 
 ```bash
-docker compose -f mercatus-platform/compose/docker-compose.yml --profile core up -d
+docker compose -f mercatus-platform/compose/docker-compose.yml --profile core --profile events --profile security up -d --wait
 ```
 
 O script de initdb do platform cria o database `inventory` em volumes novos.
@@ -62,6 +62,7 @@ Os testes de integração usam containers próprios de PostgreSQL 17.
 | `INVENTORY_DB_USER` | `mercatus` |
 | `INVENTORY_DB_PASSWORD` | `mercatus` |
 | `SERVER_PORT` | `8080` (usar porta própria ao executar vários serviços) |
+| `MERCATUS_ISSUER_URI` | `http://localhost:8180/realms/mercatus` (issuer dos tokens JWT) |
 | `inventory.reservation.ttl` | `PT30M` |
 | `inventory.reservation.expiry-interval-ms` | `60000` |
 | `inventory.reservation.expiry-batch-size` | `100` |
@@ -130,12 +131,15 @@ comando Maven. O filtro recebe ou gera `X-Correlation-Id` e o devolve na respost
 
 ```bash
 curl -X POST http://localhost:8083/api/v1/stock/SHIRT-P/receipts \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' -d '{"quantity":10}'
 
 curl -X POST http://localhost:8083/api/v1/stock/SHIRT-P/adjustments \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' -d '{"delta":-2,"reason":"Damaged units"}'
 
 curl -X POST http://localhost:8083/api/v1/reservations \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"orderId":"b4986ca0-a081-4531-bf53-06638881eeb2","lines":[{"skuCode":"SHIRT-P","quantity":3}]}'
 ```
@@ -155,7 +159,36 @@ com transação no banco.
 Ajuste exige SKU existente, delta diferente de zero e motivo não vazio. Não pode
 reduzir estoque disponível abaixo de zero. Erros usam Problem Details: validação
 ou corpo inválido `400`, recurso inexistente `404`, conflito de persistência `409`
-e violação de domínio `422`. Controle de acesso do operador entra na fase de segurança.
+e violação de domínio `422`.
+
+## Segurança
+
+Todas as rotas da API acima exigem `Authorization: Bearer <token>` com o papel
+`OPERATOR` (o papel `ADMIN`, composto no realm, o inclui). Ficam públicas apenas
+`GET /ping`, `/actuator/health`, `/actuator/info` e o OpenAPI (`/v3/api-docs`,
+`/swagger-ui`); qualquer outra rota é negada.
+
+O token é um JWT do realm `mercatus` do Keycloak: o serviço confere assinatura
+(chaves públicas do realm, obtidas em `<issuer>/protocol/openid-connect/certs` e
+mantidas em cache), issuer e validade, e lê os papéis de `realm_access.roles`.
+Sem token ou com token inválido, expirado ou de outro issuer, a resposta é `401`
+com `WWW-Authenticate: Bearer`; papel sem permissão recebe `403`; se o token não
+puder ser verificado porque as chaves do Keycloak estão inacessíveis, `503`.
+Todas em Problem Details e com `X-Correlation-Id`. O serviço inicia mesmo com o
+Keycloak fora do ar.
+
+Os comandos e eventos Kafka da saga não passam por essa verificação: a
+segurança se aplica à API HTTP.
+
+Para obter um token de operador no Keycloak local:
+
+```bash
+TOKEN=$(curl -s http://localhost:8180/realms/mercatus/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=mercatus-cli -d username=operator -d password=operator \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])')
+```
+
+Os usuários de teste e os clientes do realm estão no [README do Platform](../mercatus-platform/README.md).
 
 ## Consistência e histórico
 
@@ -178,7 +211,7 @@ ao terminar a varredura, volta ao início e tenta novamente os pendentes. O limi
 temporal fica fixo durante a varredura, para que novos vencimentos não adiem
 indefinidamente essa retomada. O progresso fica em memória por instância e
 reinicia ao subir a aplicação. Falhas são registradas e não revertem outras expirações.
-A confirmação de pagamento ainda será integrada em fases posteriores; o TTL
+A confirmação de pagamento ainda não está integrada; quando estiver, o TTL
 precisará ser maior que o prazo de pagamento.
 
 O lock pessimista foi escolhido após comparação já realizada pelo responsável
@@ -205,7 +238,7 @@ HAVING s.on_hand <> COALESCE(SUM(m.quantity), 0);
 O resultado deve ser vazio. A aplicação não oferece atualização/exclusão de
 movimentos nem exclusão em cascata; `SHIPMENT` é único por reserva e SKU.
 
-## Validação desta entrega
+## Testes
 
 ```bash
 mvn test
@@ -213,13 +246,16 @@ mvn verify
 ```
 
 `mvn test` executa os testes locais de domínio, aplicação, validação e
-arquitetura; `mvn verify` também executa os testes `*IT` com PostgreSQL real.
-Testcontainers cria containers próprios e não exige que o Compose esteja
-iniciado. Este repositório ainda não possui workflow de CI próprio.
+arquitetura; `mvn verify` também executa os testes `*IT` com PostgreSQL real
+(e Kafka nos testes de mensageria). Testcontainers cria containers próprios e
+não exige que o Compose esteja iniciado.
 
-Após as melhorias da revisão em 2026-10-24, compilação e 61 testes de domínio,
-aplicação, validação e arquitetura passaram com Java 25. `mvn clean verify`
-chegou aos testes de integração, mas Testcontainers não conseguiu
-acessar o socket Docker (`Operation not permitted`). Os testes de migrations,
-SQL de locks e concorrência foram escritos e compilados; a execução com
-PostgreSQL real permanece pendente. A fase 4 ainda não está declarada concluída.
+`InventorySecurityIT` cobre rotas públicas, ausência de token, token malformado,
+assinado por chave desconhecida, expirado e de outro issuer, `403` por papel,
+rotas sem regra e a matriz de papéis por endpoint;
+`InventoryIdentityProviderOutageIT`, o serviço com o Keycloak inacessível (`401`
+sem token, `503` com token). Os testes de integração não usam o Keycloak:
+`TestTokens` gera um par de chaves RSA em memória a cada execução, assina os JWTs
+e publica a chave pública num servidor HTTP local, no mesmo formato JWKS do
+Keycloak; o serviço é apontado para ele por `jwk-set-uri`, mantendo a validação
+de issuer. Nenhuma chave é versionada.
